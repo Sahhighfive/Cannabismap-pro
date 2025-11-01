@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canabismap Pro - Legale Cannabis Standorte</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+background: #0a1f15;
+}
+#map {
+height: 100vh;
+width: 100vw;
+}
+
+.status-banner {
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+z-index: 1000;
+padding: 1rem;
+text-align: center;
+font-weight: bold;
+font-size: 1.2rem;
+background: rgba(255, 68, 68, 0.95);
+color: white;
+border-bottom: 3px solid #cc0000;
+}
+
+.legal {
+background: rgba(12, 127, 62, 0.95);
+border-bottom-color: #0a6b34;
+}
+
+.action-buttons {
+position: fixed;
+bottom: 20px;
+left: 50%;
+transform: translateX(-50%);
+z-index: 1000;
+display: flex;
+gap: 1rem;
+}
+
+.action-btn {
+background: #0c7f3e;
+color: white;
+border: none;
+padding: 12px 24px;
+border-radius: 25px;
+font-weight: bold;
+cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div class="status-banner" id="statusBanner">❌ ILLEGAL - Hier nicht konsumieren!</div>
+<div id="map"></div>
+<div class="action-buttons">
+<button class="action-btn" onclick="navigateToNearest()">🗺️ Zur legalen Location</button>
+<button class="action-btn" onclick="buyApp()">💰 App kaufen</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Karte initialisieren
+const map = L.map('map').setView([52.5200, 13.4050], 13);
+
+// Karten-Layer hinzufügen
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+attribution: '© OpenStreetMap'
+}).addTo(map);
+
+// Legale Standorte
+const legalShops = [
+{ name: "Legal Zone Berlin", lat: 52.5200, lng: 13.4050 },
+{ name: "Cannabis Center", lat: 52.5150, lng: 13.4020 },
+{ name: "Green Dispensary", lat: 52.5250, lng: 13.4080 }
+];
+
+// Marker für legale Shops
+legalShops.forEach(shop => {
+L.marker([shop.lat, shop.lng])
+.addTo(map)
+.bindPopup(`<b>${shop.name}</b><br><button onclick="navigateTo(${shop.lat}, ${shop.lng})">🗺️ Navigieren</button>`);
+});
+
+// Standort des Benutzers abfragen
+if (navigator.geolocation) {
+navigator.geolocation.getCurrentPosition(
+position => {
+const userLat = position.coords.latitude;
+const userLng = position.coords.longitude;
+
+// Benutzerposition auf der Karte anzeigen
+L.marker([userLat, userLng])
+.addTo(map)
+.bindPopup('Dein Standort');
+
+// Karte auf Benutzer zentrieren
+map.setView([userLat, userLng], 15);
+
+// Prüfen, ob der Benutzer in der Nähe eines legalen Shops ist
+checkLegalStatus(userLat, userLng);
+},
+error => {
+console.log('Standort konnte nicht abgerufen werden:', error);
+}
+);
+}
+
+function checkLegalStatus(userLat, userLng) {
+let isLegal = false;
+let nearestDistance = Infinity;
+
+legalShops.forEach(shop => {
+const distance = calculateDistance(userLat, userLng, shop.lat, shop.lng);
+if (distance < nearestDistance) {
+nearestDistance = distance;
+}
+if (distance < 0.1) { // 100 Meter
+isLegal = true;
+}
+});
+
+const statusBanner = document.getElementById('statusBanner');
+if (isLegal) {
+statusBanner.textContent = '✅ LEGAL - Du kannst hier konsumieren';
+statusBanner.className = 'status-banner legal';
+} else {
+statusBanner.textContent = `❌ ILLEGAL - Nächster legaler Standort: ${(nearestDistance * 1000).toFixed(0)}m`;
+}
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+const R = 6371; // Erdradius in Kilometern
+const dLat = (lat2 - lat1) * Math.PI / 180;
+const dLon = (lon2 - lon1) * Math.PI / 180;
+const a =
+Math.sin(dLat/2) * Math.sin(dLat/2) +
+Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+Math.sin(dLon/2) * Math.sin(dLon/2);
+const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+return R * c;
+}
+
+function navigateTo(lat, lng) {
+window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+}
+
+function navigateToNearest() {
+// Einfach zum ersten Shop navigieren
+navigateTo(legalShops[0].lat, legalShops[0].lng);
+}
+
+function buyApp() {
+alert('Canabismap Pro - 4,99€\n\n✅ Echtzeit Legal/Illegal Status\n✅ Navigation zu legalen Standorten\n✅ Einmalzahlung, keine Abos!');
+}
+</script>
+</body>
+</html>
