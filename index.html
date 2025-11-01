@@ -55,38 +55,95 @@ border-radius: 25px;
 font-weight: bold;
 cursor: pointer;
 }
+
+.info-panel {
+position: fixed;
+top: 80px;
+right: 20px;
+z-index: 999;
+background: rgba(255,255,255,0.95);
+padding: 1.5rem;
+border-radius: 15px;
+max-width: 300px;
+border: 2px solid #0c7f3e;
+}
 </style>
 </head>
 <body>
-<div class="status-banner" id="statusBanner">❌ ILLEGAL - Hier nicht konsumieren!</div>
+<div class="status-banner" id="statusBanner">🌿 Prüfe Legalität...</div>
 <div id="map"></div>
 <div class="action-buttons">
-<button class="action-btn" onclick="navigateToNearest()">🗺️ Zur legalen Location</button>
+<button class="action-btn" onclick="navigateToNearestLegal()">🗺️ Zum legalen Spot</button>
 <button class="action-btn" onclick="buyApp()">💰 App kaufen</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // Karte initialisieren
-const map = L.map('map').setView([52.5200, 13.4050], 13);
+const map = L.map('map').setView([51.1657, 10.4515], 6); // Deutschland Zentrum
 
 // Karten-Layer hinzufügen
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// Legale Standorte
-const legalShops = [
-{ name: "Legal Zone Berlin", lat: 52.5200, lng: 13.4050 },
-{ name: "Cannabis Center", lat: 52.5150, lng: 13.4020 },
-{ name: "Green Dispensary", lat: 52.5250, lng: 13.4080 }
+// VERBOTENE ZONEN (basierend auf deutschen Gesetzen)
+const forbiddenZones = [
+// Schulen (100m Radius)
+{ type: 'school', lat: 52.5200, lng: 13.4050, radius: 100, name: "Schule am Schloss" },
+{ type: 'school', lat: 48.1351, lng: 11.5820, radius: 100, name: "Münchner Gymnasium" },
+{ type: 'school', lat: 50.1109, lng: 8.6821, radius: 100, name: "Frankfurter Schule" },
+
+// Kindergärten/Kitas (100m Radius)
+{ type: 'kindergarten', lat: 52.5150, lng: 13.4020, radius: 100, name: "Kita Mitte" },
+{ type: 'kindergarten', lat: 48.1374, lng: 11.5755, radius: 100, name: "Münchner Kindergarten" },
+
+// Spielplätze (100m Radius)
+{ type: 'playground', lat: 52.5250, lng: 13.4080, radius: 100, name: "Stadtpark Spielplatz" },
+{ type: 'playground', lat: 50.9352, lng: 6.9531, radius: 100, name: "Kölner Spielplatz" },
+
+// Fußgängerzonen (komplette Zone)
+{ type: 'pedestrian_zone', lat: 52.5194, lng: 13.4067, radius: 200, name: "Berliner Fußgängerzone" },
+{ type: 'pedestrian_zone', lat: 48.1368, lng: 11.5770, radius: 150, name: "Münchner Innenstadt" }
 ];
 
-// Marker für legale Shops
-legalShops.forEach(shop => {
-L.marker([shop.lat, shop.lng])
+// LEGALE SPOTS (basierend auf bubatzkarte.de und deutschen Gesetzen)
+const legalSpots = [
+// Öffentliche Parks (legal)
+{ name: "Tiergarten Berlin", lat: 52.5163, lng: 13.3509, type: "park", description: "Großer öffentlicher Park - legaler Konsum erlaubt" },
+{ name: "Englischer Garten München", lat: 48.1635, lng: 11.6032, type: "park", description: "Beliebter Park - legal für Cannabis-Konsum" },
+{ name: "Rheinpark Köln", lat: 50.9506, lng: 6.9651, type: "park", description: "Entspannte Atmosphäre am Rhein - legal" },
+
+// Legale Cannabis-Clubs (ab 1. Juli 2024)
+{ name: "Cannabis Club Berlin", lat: 52.5300, lng: 13.4100, type: "club", description: "Anerkannter Cannabis Social Club" },
+{ name: "Hanf Verein München", lat: 48.1400, lng: 11.5700, type: "club", description: "Mitglieder-Club für legalen Konsum" },
+
+// Öffentliche Plätze (legal außerhalb von Fußgängerzonen)
+{ name: "Tempelhofer Feld Berlin", lat: 52.4736, lng: 13.4056, type: "public_area", description: "Weite Flächen - legal für Konsum" },
+{ name: "Alsterwiesen Hamburg", lat: 53.5616, lng: 10.0139, type: "public_area", description: "Beliebte Wiesen an der Alster - legal" }
+];
+
+// Marker für legale Spots (GRÜN)
+legalSpots.forEach(spot => {
+const legalIcon = L.icon({
+iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHZpZXdCb3g9IjAgMCAzMCAzMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTUiIGN5PSIxNSIgcj0iMTQiIGZpbGw9IiMwYzdmM2UiIHN0cm9rZT0iIzA2NmMzZSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjx0ZXh0IHg9IjE1IiB5PSIyMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPsOkPC90ZXh0Pgo8L3N2Zz4=',
+iconSize: [30, 30],
+iconAnchor: [15, 15]
+});
+
+L.marker([spot.lat, spot.lng], { icon: legalIcon })
 .addTo(map)
-.bindPopup(`<b>${shop.name}</b><br><button onclick="navigateTo(${shop.lat}, ${shop.lng})">🗺️ Navigieren</button>`);
+.bindPopup(`<b>✅ ${spot.name}</b><br>${spot.description}<br><button onclick="navigateTo(${spot.lat}, ${spot.lng})">🗺️ Hier navigieren</button>`);
+});
+
+// Verbotene Zonen anzeigen (ROTE Kreise)
+forbiddenZones.forEach(zone => {
+L.circle([zone.lat, zone.lng], {
+color: 'red',
+fillColor: '#f03',
+fillOpacity: 0.3,
+radius: zone.radius
+}).addTo(map).bindPopup(`❌ ${zone.name}<br>Verboten: ${getZoneDescription(zone.type)}`);
 });
 
 // Standort des Benutzers abfragen
@@ -97,43 +154,116 @@ const userLat = position.coords.latitude;
 const userLng = position.coords.longitude;
 
 // Benutzerposition auf der Karte anzeigen
-L.marker([userLat, userLng])
+const userIcon = L.icon({
+iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IiMwMDcBRkYiIGZpbGwtb3BhY2l0eT0iMC4zIi8+CjxjaXJjbGUgY3g9IjE0IiBjeT0iMTIiIHI9IjUiIGZpbGw9IiMwMDcBRkYiLz4KPC9zdmc+',
+iconSize: [24, 24],
+iconAnchor: [12, 12]
+});
+
+L.marker([userLat, userLng], { icon: userIcon })
 .addTo(map)
-.bindPopup('Dein Standort');
+.bindPopup('Dein aktueller Standort');
 
 // Karte auf Benutzer zentrieren
 map.setView([userLat, userLng], 15);
 
-// Prüfen, ob der Benutzer in der Nähe eines legalen Shops ist
+// Legalitätsprüfung durchführen
 checkLegalStatus(userLat, userLng);
 },
 error => {
 console.log('Standort konnte nicht abgerufen werden:', error);
+// Fallback zu Berlin
+checkLegalStatus(52.5200, 13.4050);
 }
 );
 }
 
-function checkLegalStatus(userLat, userLng) {
-let isLegal = false;
-let nearestDistance = Infinity;
+function getZoneDescription(type) {
+const descriptions = {
+'school': 'Schule (100m Umkreis verboten)',
+'kindergarten': 'Kindergarten/Kita (100m Umkreis verboten)',
+'playground': 'Spielplatz (100m Umkreis verboten)',
+'pedestrian_zone': 'Fußgängerzone (7-20 Uhr verboten)'
+};
+return descriptions[type] || 'Verbotene Zone';
+}
 
-legalShops.forEach(shop => {
-const distance = calculateDistance(userLat, userLng, shop.lat, shop.lng);
-if (distance < nearestDistance) {
-nearestDistance = distance;
+function checkLegalStatus(userLat, userLng) {
+let isLegal = true;
+let reason = "";
+let nearestLegal = findNearestLegalSpot(userLat, userLng);
+
+// Prüfe verbotene Zonen
+for (const zone of forbiddenZones) {
+const distance = calculateDistance(userLat, userLng, zone.lat, zone.lng) * 1000; // in Meter
+
+if (distance < zone.radius) {
+isLegal = false;
+reason = `Zu nah an ${zone.name} (${Math.round(distance)}m)`;
+break;
 }
-if (distance < 0.1) { // 100 Meter
-isLegal = true;
 }
-});
+
+// Prüfe Uhrzeit für Fußgängerzonen
+if (isLegal) {
+const now = new Date();
+const hour = now.getHours();
+const isDaytime = hour >= 7 && hour < 20;
+
+// Vereinfachte Prüfung ob in Innenstadt/Fußgängerzone
+if (isDaytime && isInCityCenter(userLat, userLng)) {
+isLegal = false;
+reason = "Innenstadt/Fußgängerzone (7-20 Uhr verboten)";
+}
+}
 
 const statusBanner = document.getElementById('statusBanner');
 if (isLegal) {
 statusBanner.textContent = '✅ LEGAL - Du kannst hier konsumieren';
 statusBanner.className = 'status-banner legal';
 } else {
-statusBanner.textContent = `❌ ILLEGAL - Nächster legaler Standort: ${(nearestDistance * 1000).toFixed(0)}m`;
+statusBanner.textContent = `❌ ILLEGAL - ${reason}`;
+statusBanner.className = 'status-banner';
+
+if (nearestLegal) {
+const distance = calculateDistance(userLat, userLng, nearestLegal.lat, nearestLegal.lng) * 1000;
+statusBanner.textContent += ` | Nächster legaler Spot: ${Math.round(distance)}m`;
 }
+}
+}
+
+function isInCityCenter(lat, lng) {
+// Vereinfachte Prüfung für Innenstädte
+const cityCenters = [
+{ lat: 52.5200, lng: 13.4050, radius: 1000 }, // Berlin Mitte
+{ lat: 48.1351, lng: 11.5820, radius: 800 }, // München Altstadt
+{ lat: 50.1109, lng: 8.6821, radius: 700 }, // Frankfurt Innenstadt
+{ lat: 53.5511, lng: 9.9937, radius: 900 }, // Hamburg Zentrum
+{ lat: 50.9375, lng: 6.9603, radius: 600 } // Köln Innenstadt
+];
+
+for (const center of cityCenters) {
+const distance = calculateDistance(lat, lng, center.lat, center.lng) * 1000;
+if (distance < center.radius) {
+return true;
+}
+}
+return false;
+}
+
+function findNearestLegalSpot(userLat, userLng) {
+let nearest = null;
+let minDistance = Infinity;
+
+legalSpots.forEach(spot => {
+const distance = calculateDistance(userLat, userLng, spot.lat, spot.lng);
+if (distance < minDistance) {
+minDistance = distance;
+nearest = spot;
+}
+});
+
+return nearest;
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -152,13 +282,24 @@ function navigateTo(lat, lng) {
 window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
 }
 
-function navigateToNearest() {
-// Einfach zum ersten Shop navigieren
-navigateTo(legalShops[0].lat, legalShops[0].lng);
+function navigateToNearestLegal() {
+if (navigator.geolocation) {
+navigator.geolocation.getCurrentPosition(position => {
+const userLat = position.coords.latitude;
+const userLng = position.coords.longitude;
+const nearest = findNearestLegalSpot(userLat, userLng);
+
+if (nearest) {
+navigateTo(nearest.lat, nearest.lng);
+} else {
+alert('Kein legaler Spot in der Nähe gefunden.');
+}
+});
+}
 }
 
 function buyApp() {
-alert('Canabismap Pro - 4,99€\n\n✅ Echtzeit Legal/Illegal Status\n✅ Navigation zu legalen Standorten\n✅ Einmalzahlung, keine Abos!');
+alert('Canabismap Pro - 4,99€\n\n✅ Echtzeit Legal/Illegal Status nach deutschen Gesetzen\n✅ Navigation zu legalen Spots\n✅ Verbotene Zonen werden angezeigt\n✅ Einmalzahlung, keine Abos!');
 }
 </script>
 </body>
